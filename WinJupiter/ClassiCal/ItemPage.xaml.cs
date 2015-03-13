@@ -90,9 +90,9 @@ namespace ClassiCal
             chatroomAppBar.PrimaryCommands.Insert(0, sendButon);
         }
 
-        void sendButon_Click(object sender, RoutedEventArgs e)
+        private async void sendButon_Click(object sender, RoutedEventArgs e)
         {
-            ChatroomViewModel.SendMessage(tbMessageContent.Text);
+            await ChatroomViewModel.SendMessage(tbMessageContent.Text);
             tbMessageContent.Text = String.Empty;
             // Supress the weird textbox gotfocus after presing resend
             listviewMessages.Focus(FocusState.Pointer);
@@ -139,7 +139,11 @@ namespace ClassiCal
         /// session.  The state will be null the first time a page is visited.</param>
         private void NavigationHelper_LoadState(object sender, LoadStateEventArgs e)
         {
-            ChatroomViewModel = new ChatRoomViewModel((string)e.NavigationParameter);
+            //string classid = (string)e.NavigationParameter;
+            string classid = "SAMPLECLASSID";
+            ChatroomViewModel = ((App)App.Current).AppMembers.ChatRoomViewModels[classid];
+            ChatroomViewModel.Dispatcher = Dispatcher;
+            ChatroomViewModel.TryConnect();
         }
 
         /// <summary>
@@ -199,12 +203,12 @@ namespace ClassiCal
             }
         }
 
-        private void btnChatroomResend_Click(object sender, RoutedEventArgs e)
+        private async void btnChatroomResend_Click(object sender, RoutedEventArgs e)
         {
             ChatContent toResend = (ChatContent)((Button)sender).DataContext;
             // Hide Resend button
             toResend.SendFailed = false;
-            ChatroomViewModel.ResendMessage(toResend);
+            await ChatroomViewModel.ResendMessage(toResend);
         }
 
     }

@@ -26,6 +26,8 @@ namespace ClassiCal
     /// </summary>
     public sealed partial class App : Application
     {
+        public AppMember AppMembers { get; private set; }
+
         private TransitionCollection transitions;
 
         /// <summary>
@@ -36,6 +38,7 @@ namespace ClassiCal
         {
             this.InitializeComponent();
             this.Suspending += this.OnSuspending;
+            AppMembers = new AppMember();
         }
 
         /// <summary>

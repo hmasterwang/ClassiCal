@@ -2,10 +2,12 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Runtime.Serialization;
 using System.Text;
 
 namespace ClassiCal
 {
+    [DataContract]
     public class VMBase : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler PropertyChanged;
