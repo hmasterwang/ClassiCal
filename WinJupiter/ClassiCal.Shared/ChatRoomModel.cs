@@ -18,15 +18,34 @@ namespace ClassiCal
                                           new DataContractJsonSerializer(typeof(ChatContent));
         private MessageWebSocket _websocket;
         private DataWriter _websocketWriter;
+        private Object _lockMessageToSend = new Object();
+        private List<ChatContent> _messagesToSend = new List<ChatContent>();
 
         public event EventHandler<ChatRoomMessageEventArgs> MessageArrived;
         public event EventHandler<ChatRoomMessageEventArgs> MessageSent;
         public event EventHandler<ChatRoomMessageEventArgs> MessageFailedToSend;
+        public event EventHandler<ChatRoomConnectionStateChangedArgs> ServerConnectionStateChanged;
+
+        public ConnectionState State { get; private set; }
+
+        public enum ConnectionState
+        {
+            Disconnected,
+            Connecting,
+            Connected
+        }
 
         public ChatRoomModel(string classID, string username)
         {
             _classID = classID;
             _username = username;
+            State = ConnectionState.Disconnected;
+        }
+
+        private void ChangeConnectionState(ConnectionState state)
+        {
+            State = state;
+            RaiseEvent(ServerConnectionStateChanged, new ChatRoomConnectionStateChangedArgs(state));
         }
 
         public async Task Connect()
@@ -35,36 +54,44 @@ namespace ClassiCal
             {
                 // Make a local copy to avoid races with Closed events.
                 MessageWebSocket webSocket = _websocket;
-
                 // Have we connected yet?
                 if (webSocket == null)
                 {
+                    ChangeConnectionState(ConnectionState.Connecting);
                     Uri server = new Uri(Constants.GetChatroomAddr(_username, _classID));
 
                     webSocket = new MessageWebSocket();
-                    // MessageWebSocket supports both utf8 and binary messages.
-                    // When utf8 is specified as the messageType, then the developer
-                    // promises to only send utf8-encoded data.
                     webSocket.Control.MessageType = SocketMessageType.Utf8;
-                    // Set up callbacks
+
                     webSocket.MessageReceived += webSocket_MessageReceived;
                     webSocket.Closed += webSocket_Closed;
 
                     await webSocket.ConnectAsync(server);
-                    _websocket = webSocket; // Only store it after successfully connecting.
+                    _websocket = webSocket;
                     _websocketWriter = new DataWriter(webSocket.OutputStream);
+                    ChangeConnectionState(ConnectionState.Connected);
+                    await SendMessagesQueue();
                 }
             }
             catch (Exception ex) // For debugging
             {
                 WebErrorStatus status = WebSocketError.GetStatus(ex.GetBaseException().HResult);
                 // Add your specific error-handling code here.
+                _websocket = null;
+                ChangeConnectionState(ConnectionState.Disconnected);
             }
+        }
+
+        public void Disconnect()
+        {
+            if (_websocket != null)
+                _websocket.Close(1000, "Client initiated close");
         }
 
         void webSocket_Closed(IWebSocket sender, WebSocketClosedEventArgs args)
         {
-            throw new NotImplementedException();
+            _websocket = null;
+            ChangeConnectionState(ConnectionState.Disconnected);
         }
 
         void webSocket_MessageReceived(MessageWebSocket sender, MessageWebSocketMessageReceivedEventArgs args)
@@ -90,12 +117,39 @@ namespace ClassiCal
                 catch (Exception ex) // For debugging
                 {
                     WebErrorStatus status = WebSocketError.GetStatus(ex.GetBaseException().HResult);
-                    // Add your specific error-handling code here.
+                    _websocket = null;
+                    ChangeConnectionState(ConnectionState.Disconnected);
                 }
             }
         }
 
+        private async Task SendMessagesQueue()
+        {
+            while (_messagesToSend.Count != 0)
+            {
+                if (State != ConnectionState.Connected)
+                    return;
+
+                ChatContent chatContent;
+                lock (_lockMessageToSend)
+                {
+                    chatContent = _messagesToSend[0];
+                    _messagesToSend.Remove(chatContent);
+                }
+                await SendMessageSocket(chatContent);
+            }
+        }
+
         public async Task SendMessage(ChatContent chatContent)
+        {
+            lock (_lockMessageToSend)
+            {
+                _messagesToSend.Add(chatContent);
+            }
+            await SendMessagesQueue();
+        }
+
+        private async Task SendMessageSocket(ChatContent chatContent)
         {
             bool messageSent = false;
             string json;
@@ -136,7 +190,8 @@ namespace ClassiCal
             }
         }
 
-        private void RaiseEvent(EventHandler<ChatRoomMessageEventArgs> handler, ChatRoomMessageEventArgs arg)
+        private void RaiseEvent<TEventArgs>(EventHandler<TEventArgs> handler, TEventArgs arg)
+            where TEventArgs : EventArgs
         {
             if (handler != null)
             {
@@ -152,6 +207,16 @@ namespace ClassiCal
         public ChatRoomMessageEventArgs(ChatContent content = null)
         {
             Content = content;
+        }
+    }
+
+    public class ChatRoomConnectionStateChangedArgs : EventArgs
+    {
+        public ChatRoomModel.ConnectionState State { get; private set; }
+
+        public ChatRoomConnectionStateChangedArgs(ChatRoomModel.ConnectionState state)
+        {
+            State = state;
         }
     }
 }

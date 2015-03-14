@@ -10,6 +10,7 @@
     mc:Ignorable="d"
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
     <Page.Resources>
+        <local:ChatRoomConnectionStateToTextConverter x:Key="ChatRoomConnectionStateToTextConverter"/>
         <local:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
         <local:SentStatusToOpacityConverter x:Key="SentStatusToOpacityConverter"/>
         <local:BubbleWidthConverter x:Key="BubbleWidthConverter"/>
@@ -50,6 +51,7 @@
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
+                    <TextBlock Text="{Binding ConnectionState, Converter={StaticResource ChatRoomConnectionStateToTextConverter}}" />
                     <ScrollViewer x:Name="chatroomScrollViewer" 
                               HorizontalAlignment="Stretch" 
                               VerticalAlignment="Stretch">

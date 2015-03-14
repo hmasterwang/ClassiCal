@@ -14,6 +14,12 @@ namespace ClassiCal
         private ChatRoomModel _chatroomModel;
         public ObservableCollection<ChatContent> ChatHistory { get { return _chatHistory; } }
         public CoreDispatcher Dispatcher { get; set; }
+        private ChatRoomModel.ConnectionState _connectionState = ChatRoomModel.ConnectionState.Disconnected;
+        public ChatRoomModel.ConnectionState ConnectionState
+        {
+            get { return _connectionState; }
+            private set { SetProperty(ref _connectionState, value); }
+        }
 
         private string _username;
 
@@ -23,14 +29,21 @@ namespace ClassiCal
             _username = username;
             _chatroomModel = new ChatRoomModel(classID, username);
             _chatroomModel.MessageArrived += _chatroomModel_MessageArrived;
+            _chatroomModel.ServerConnectionStateChanged += _chatroomModel_ServerConnectionStateChanged;
+        }
+
+        async void _chatroomModel_ServerConnectionStateChanged(object sender, ChatRoomConnectionStateChangedArgs e)
+        {
+            await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                ConnectionState = e.State;
+            });
         }
 
         async void _chatroomModel_MessageArrived(object sender, ChatRoomMessageEventArgs e)
         {
             ChatContent content = e.Content;
             content.SentRecvTime = DateTime.Now;
-            
-            // FIXME: Threading issue here. This is a handler running in different thread.
 
             if (Dispatcher != null)
             {
@@ -38,10 +51,9 @@ namespace ClassiCal
                 {
                     ChatHistory.Add(content);
                 });
+
             }
         }
-
-        
 
         public async Task SendMessage(string content)
         {

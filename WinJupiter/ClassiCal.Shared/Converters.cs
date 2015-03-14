@@ -83,4 +83,21 @@ namespace ClassiCal
             throw new NotImplementedException();
         }
     }
+
+    public class ChatRoomConnectionStateToTextConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, string language)
+        {
+            var val = (ChatRoomModel.ConnectionState)value;
+            if (val == ChatRoomModel.ConnectionState.Connected)
+                return String.Empty;
+            else
+                return val.ToString();
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, string language)
+        {
+            throw new NotImplementedException();
+        }
+    }
 }
